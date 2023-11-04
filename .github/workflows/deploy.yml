@@ -1,59 +1,13 @@
-name: Release and Deploy
+name: Deploy
 
 on:
-  push:
-    branches:
-      - development
-      - staging
-      - main
+  release:
+    types: ['published']
 
 jobs:
-  version:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # Allow github token the permission to create release
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-
-      - name: Git Version
-        id: version
-        uses: codacy/git-version@2.7.1
-        with:
-          release-branch: main
-          dev-branch: development
-          minor-identifier: "feat:"
-          major-identifier: "break:"
-          prefix: "v"
-
-      - name: Create Pre-Release
-        if: ${{ ! endsWith(github.ref, 'main') }}
-        run: |
-          gh release create "${{ steps.version.outputs.version }}" \
-            --title "Release ${{ steps.version.outputs.version }}" \
-            --generate-notes \
-            --prerelease
-        env:
-          GH_TOKEN: ${{ github.token }}     
-
-      - name: Create Release
-        if: ${{ endsWith(github.ref, 'main') }}
-        run: |
-          gh release create "${{ steps.version.outputs.version }}" \
-            --title "Release ${{ steps.version.outputs.version }}" \
-            --generate-notes
-        env:
-          GH_TOKEN: ${{ github.token }}     
-
   build-and-deploy:
-    needs: version
-    if: ${{ ! endsWith(github.ref, 'main') }}
-    name: Build and Deploy Application
+    if: ${{ contains(github.ref, 'staging') || contains(github.ref, 'SNAPSHOT') }}
+    name: Deploy Application
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -62,6 +16,6 @@ jobs:
       - name: Run Deployment Script
         run: bash ./scripts/deploy-pipeline.sh
         env:
-          GCP_CREDENTIALS: ${{ github.ref == 'refs/heads/staging' && secrets.GCP_CREDENTALS_HMG || secrets.GCP_CREDENTIALS_DEV }}
+          GCP_CREDENTIALS: ${{ contains(github.ref, 'staging') || secrets.GCP_CREDENTALS_HMG || secrets.GCP_CREDENTIALS_DEV }}
           COMMIT_SHA: ${{ github.sha }}
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${GITHUB_REF##*/}
