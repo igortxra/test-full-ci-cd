@@ -62,6 +62,6 @@ jobs:
       - name: Run Deployment Script
         run: bash ./scripts/deploy-pipeline.sh
         env:
-          GCP_CREDENTIALS: ${{ github.ref == 'refs/heads/staging' && secrets.GCP_CREDENTALS_HMG || GCP_CREDENTIALS_DEV }}
+          GCP_CREDENTIALS: ${{ github.ref == 'refs/heads/staging' && secrets.GCP_CREDENTALS_HMG || secrets.GCP_CREDENTIALS_DEV }}
           COMMIT_SHA: ${{ github.sha }}
           VERSION: ${{ needs.version.outputs.version }}
