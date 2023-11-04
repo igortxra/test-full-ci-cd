@@ -1,0 +1,47 @@
+[tool.poetry]
+name = "test-ci-cd"
+version = "0.0.1"
+description = "Experimental for CI/CD demo"
+authors = ["igortxra <igor.teixeira@cromai.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+flask = "^3.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pylint = "^3.0.2"
+coverage = "^7.3.2"
+bandit = "^1.7.5"
+isort = "^5.12.0"
+pyink = "^23.10.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.coverage.run]
+source = [
+  "app"
+]
+branch = true
+command_line = "-m pytest"
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover"]
+fail_under = 100 
+
+[tool.pytest.ini_options]
+addopts = "-v"
+
+[tool.pyink]
+line-length = 120
+
+[tool.bandit]
+exclude_dirs = [".venv","venv","tests"]
+
+[tool.pylint."message control"]
+disable = [
+  "missing-module-docstring",
+]
