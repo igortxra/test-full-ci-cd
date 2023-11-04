@@ -1,0 +1,101 @@
+name: Release and Deploy
+
+on:
+  push:
+    branches:
+      - development
+      - staging
+      - main
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Allow github token the permission to create release
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Set Version
+        id: version
+        uses: codacy/git-version@2.7.1
+        with:
+          release-branch: main
+          dev-branch: development
+          minor-identifier: "feat:"
+          major-identifier: "break:"
+          prefix: "v"
+
+      - name: Create Release
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          gh release create "$TAG" \
+            --title "Release $TAG" \
+            --generate-notes \
+        env:
+          GH_TOKEN: ${{ github.token }}     
+          TAG: ${{ steps.version.outputs.version }}
+
+      - name: Create Pre-Release
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          gh release create "$TAG" \
+            --title "Release $TAG" \
+            --generate-notes \
+            --prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}     
+          TAG: ${{ steps.version.outputs.version }}
+
+  deploy-development:
+    name: Deploy - Development
+    needs: version
+    if: ${{ github.ref == 'refs/heads/development' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Run Deployment Script
+        run: bash ./scripts/deploy-pipeline.sh
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS_DEV }}
+          COMMIT_SHA: ${{ github.sha }}
+          VERSION: ${{ needs.version.outputs.version }}
+  
+  deploy-staging:
+    name: Deploy - Staging
+    needs: version
+    if: ${{ github.ref == 'refs/heads/staging' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Run Deployment Script
+        run: bash ./scripts/deploy-pipeline.sh
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS_HMG }}
+          COMMIT_SHA: ${{ github.sha }}
+          VERSION: ${{ needs.version.outputs.version }}
+
+  deploy-production:
+    name: Deploy - Production
+    needs: version
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Run Deployment Script
+        run: bash ./scripts/deploy-pipeline.sh
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS_PROD }}
+          COMMIT_SHA: ${{ github.sha }}
+          VERSION: ${{ needs.version.outputs.version }}
