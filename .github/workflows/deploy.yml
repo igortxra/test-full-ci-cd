@@ -1,0 +1,46 @@
+name: Deploy
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - development
+
+jobs:
+  create-release:
+    if: github.event.pull_request.merged == true
+    name: Create Release
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Create Release
+        run: |
+          source ./scripts/version.sh --development
+
+          gh release create "$TAG" \
+            --title "Release $TAG" \
+            --generate-notes \
+            --prerelease
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN }}
+
+  build-and-deploy-develop:
+    if: github.event.pull_request.merged == true
+    needs: create-release
+    name: Build and Deploy Application
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Run Deployment Script
+        run: bash ./scripts/deploy-pipeline.sh
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS_DEV }}
+          COMMIT_SHA: ${{ github.sha }}
