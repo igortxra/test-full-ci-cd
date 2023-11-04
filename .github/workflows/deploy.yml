@@ -2,12 +2,13 @@ name: Deploy
 
 on:
   workflow_run:
-    workflows: [Release]
-    types: [completed]
+    workflows:
+      - Release
+    types:
+      - completed
 
 jobs:
   build-and-deploy:
-    if: ${{ github.event.workflow_run.head_branch == 'staging' || github.event.workflow_run.head_branch == 'development' }}
     name: Deploy Application
     runs-on: ubuntu-latest
     steps:
@@ -15,6 +16,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Run Deployment Script
+        if: ${{ github.event.workflow_run.head_branch == 'staging' || github.event.workflow_run.head_branch == 'development' }}
         run: bash ./scripts/deploy-pipeline.sh
         env:
           GCP_CREDENTIALS: ${{ github.event.workflow_run.head_branch == 'staging' || secrets.GCP_CREDENTALS_HMG || secrets.GCP_CREDENTIALS_DEV }}
