@@ -1,40 +1,60 @@
-name: Deploy
+name: Git Version
 
 on:
-  pull_request:
-    types:
-      - closed
+  push:
     branches:
       - development
+      - staging
+      - main
 
 jobs:
-  create-release:
-    if: github.event.pull_request.merged == true
-    name: Create Release
+  version:
     runs-on: ubuntu-latest
-    continue-on-error: true
-
+    permissions:
+      contents: write # Allow github token the permission to create release
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          ref: ${{ github.head_ref }}   # checkout the correct branch name
+          fetch-depth: 0                # fetch the whole repo history
 
-      - name: Create Release
+      - name: Git Version
+        id: version
+        uses: codacy/git-version@2.7.1
+        with:
+          release-branch: main
+          dev-branch: development
+          minor-identifier: "feat:"
+          major-identifier: "break:"
+          prefix: "v"
+
+      - name: Create Pre-Release
+        if: ${{ ! endsWith(github.ref, 'main') }}
         run: |
-          source ./scripts/version.sh --development
-
-          gh release create "$TAG" \
-            --title "Release $TAG" \
+          gh release create "${{ steps.version.outputs.version }}" \
+            --title "Release ${{ steps.version.outputs.version }}" \
             --generate-notes \
             --prerelease
         env:
-          GH_TOKEN: ${{ secrets.TOKEN }}
+          GH_TOKEN: ${{ github.token }}     
 
-  build-and-deploy-develop:
-    if: github.event.pull_request.merged == true
-    needs: create-release
+      - name: Create Release
+        if: ${{ endsWith(github.ref, 'main') }}
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            --title "Release ${{ steps.version.outputs.version }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}     
+
+  build-and-deploy:
+    needs: version
+    if: ${{ endsWith(github.ref, 'staging') }}
     name: Build and Deploy Application
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -42,5 +62,6 @@ jobs:
       - name: Run Deployment Script
         run: bash ./scripts/deploy-pipeline.sh
         env:
-          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS_DEV }}
+          GCP_CREDENTIALS: ${{ github.ref == 'refs/heads/staging' && "HOMOLOGATION" || "DEVELOPMENT" }}
           COMMIT_SHA: ${{ github.sha }}
+          VERSION: ${{ needs.version.outputs.version }}
